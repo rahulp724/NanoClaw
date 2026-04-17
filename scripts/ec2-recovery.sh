@@ -20,7 +20,15 @@ npm ci
 npm run build
 echo "BUILD_OK"
 
-# Install OneCLI
+# Install Docker Compose standalone binary (required by OneCLI)
+if ! command -v docker-compose &>/dev/null; then
+  curl -SL https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64 \
+    -o /usr/local/bin/docker-compose
+  chmod +x /usr/local/bin/docker-compose
+fi
+
+# Install OneCLI (bind to localhost only — private instance)
+export ONECLI_BIND_HOST=127.0.0.1
 curl -fsSL onecli.sh/install | sh
 sleep 25
 docker update --restart always onecli onecli-postgres-1 2>/dev/null || true

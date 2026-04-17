@@ -17,7 +17,11 @@ dnf update -y
 curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
 dnf install -y nodejs git docker
 
-# 2. Docker
+# 2. Docker + Compose (standalone binary, not in AL2023 repos)
+dnf install -y docker
+curl -SL https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64 \
+  -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 systemctl enable docker
 systemctl start docker
 sleep 5
@@ -34,7 +38,8 @@ cd $APP_DIR
 npm ci
 npm run build
 
-# 5. Install OneCLI (credential proxy — runs as Docker containers)
+# 5. Install OneCLI (bind to localhost only — private instance)
+export ONECLI_BIND_HOST=127.0.0.1
 curl -fsSL onecli.sh/install | sh
 sleep 20  # wait for containers to become healthy
 
