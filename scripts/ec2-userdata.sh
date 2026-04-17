@@ -38,8 +38,8 @@ cd $APP_DIR
 npm ci
 npm run build
 
-# 5. Install OneCLI (bind to localhost only — private instance)
-export ONECLI_BIND_HOST=127.0.0.1
+# 5. Install OneCLI bound to Docker bridge gateway so agent containers can reach it
+export ONECLI_BIND_HOST=172.17.0.1
 curl -fsSL onecli.sh/install | sh
 sleep 20  # wait for containers to become healthy
 
@@ -51,7 +51,7 @@ curl -fsSL onecli.sh/cli/install | sh
 export PATH="/root/.local/bin:$PATH"
 
 # 7. Configure OneCLI and load Anthropic key from SSM
-ONECLI_URL="http://127.0.0.1:10254"
+ONECLI_URL="http://172.17.0.1:10254"
 onecli config set api-host $ONECLI_URL
 sleep 3
 

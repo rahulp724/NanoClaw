@@ -27,8 +27,8 @@ if ! command -v docker-compose &>/dev/null; then
   chmod +x /usr/local/bin/docker-compose
 fi
 
-# Install OneCLI (bind to localhost only — private instance)
-export ONECLI_BIND_HOST=127.0.0.1
+# Install OneCLI bound to Docker bridge gateway so containers can reach it
+export ONECLI_BIND_HOST=172.17.0.1
 curl -fsSL onecli.sh/install | sh
 sleep 25
 docker update --restart always onecli onecli-postgres-1 2>/dev/null || true
@@ -52,7 +52,7 @@ SLACK_APP=$(aws ssm get-parameter --name /nanoclaw/SLACK_APP_TOKEN \
   --with-decryption --query Parameter.Value --output text --region $REGION)
 
 cat > "$APP_DIR/.env" << ENVEOF
-ONECLI_URL=http://127.0.0.1:10254
+ONECLI_URL=http://172.17.0.1:10254
 SLACK_BOT_TOKEN=${SLACK_BOT}
 SLACK_APP_TOKEN=${SLACK_APP}
 CONTAINER_IMAGE=nanoclaw-agent:latest
