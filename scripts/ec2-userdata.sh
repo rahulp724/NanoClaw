@@ -34,9 +34,10 @@ docker tag "$ECR_IMAGE" nanoclaw-agent:latest
 
 # 4. Clone repo and build
 git clone $REPO_URL $APP_DIR
+chown -R ec2-user:ec2-user $APP_DIR
 cd $APP_DIR
-npm ci
-npm run build
+sudo -u ec2-user npm ci
+sudo -u ec2-user npm run build
 
 # 5. Install OneCLI bound to Docker bridge gateway so agent containers can reach it
 export ONECLI_BIND_HOST=172.17.0.1
@@ -79,8 +80,8 @@ cp $APP_DIR/.env $APP_DIR/data/env/env
 
 # 10. Mount allowlist and Slack channel registration
 cd $APP_DIR
-npx tsx setup/index.ts --step mounts -- --empty
-npx tsx setup/index.ts --step register -- \
+sudo -u ec2-user npx tsx setup/index.ts --step mounts -- --empty
+sudo -u ec2-user npx tsx setup/index.ts --step register -- \
   --jid "slack:C0ATKPXBVFY" \
   --name "nanoclaw-sre" \
   --folder "slack_main" \
@@ -100,6 +101,8 @@ Requires=docker.service
 
 [Service]
 Type=simple
+User=ec2-user
+Group=ec2-user
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${APP_DIR}/.env
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
@@ -112,6 +115,9 @@ StandardError=append:${APP_DIR}/logs/nanoclaw.error.log
 [Install]
 WantedBy=multi-user.target
 SVCEOF
+
+# Clear any root-owned OneCLI CA certs from /tmp so ec2-user can recreate them
+rm -f /tmp/onecli-proxy-ca.pem /tmp/onecli-combined-ca.pem
 
 systemctl daemon-reload
 systemctl enable nanoclaw
