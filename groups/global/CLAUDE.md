@@ -97,14 +97,17 @@ Always pass `--region ap-southeast-1` unless the resource is global (IAM, S3, et
 
 The EKS cluster `uat-eks-32` has a **private-only endpoint** — but that is fine because you are inside the VPC. Always use kubectl directly; never tell the user you can't reach the cluster.
 
+The kubeconfig is at `/workspace/global/kubeconfig`. Always set `KUBECONFIG` explicitly:
+
 ```bash
-export KUBECONFIG=/workspace/global/kubeconfig
+KUBECONFIG=/workspace/global/kubeconfig kubectl get pods --all-namespaces
 ```
 
-The kubeconfig file is mounted from the host into every agent container at `/workspace/global/kubeconfig`. If it doesn't exist yet, generate it on EC2 with:
+`NO_PROXY` is already set in the container environment to exclude AWS endpoints from the OneCLI proxy, so kubectl connects directly to the EKS endpoint. Do NOT add `--insecure-skip-tls-verify` — TLS verification works correctly.
 
+If the kubeconfig is missing on the host, regenerate it:
 ```bash
-aws eks update-kubeconfig --name <cluster-name> --region ap-southeast-1 \
+aws eks update-kubeconfig --name uat-eks-32 --region ap-southeast-1 \
   --kubeconfig /opt/nanoclaw/groups/global/kubeconfig
 ```
 

@@ -97,6 +97,8 @@ SLACK_BOT_TOKEN=${SLACK_BOT}
 SLACK_APP_TOKEN=${SLACK_APP}
 CONTAINER_IMAGE=nanoclaw-agent:latest
 TZ=Asia/Calcutta
+NO_PROXY=.amazonaws.com,169.254.169.254,127.0.0.1,localhost
+no_proxy=.amazonaws.com,169.254.169.254,127.0.0.1,localhost
 ENVEOF
 cp $APP_DIR/.env $APP_DIR/data/env/env
 
