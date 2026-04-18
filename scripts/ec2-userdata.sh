@@ -88,8 +88,11 @@ SLACK_APP=$(aws ssm get-parameter --name "/nanoclaw/SLACK_APP_TOKEN" --with-decr
 
 # 9. Write .env
 mkdir -p $APP_DIR/logs $APP_DIR/data/env
+ONECLI_API_KEY=$(docker exec onecli-postgres-1 psql -U onecli -d onecli -t -c "SELECT key FROM api_keys LIMIT 1;" 2>/dev/null | tr -d ' \n')
+
 cat > $APP_DIR/.env << ENVEOF
 ONECLI_URL=${ONECLI_URL}
+ONECLI_API_KEY=${ONECLI_API_KEY}
 SLACK_BOT_TOKEN=${SLACK_BOT}
 SLACK_APP_TOKEN=${SLACK_APP}
 CONTAINER_IMAGE=nanoclaw-agent:latest
