@@ -79,6 +79,8 @@ Standard Markdown works: `**bold**`, `*italic*`, `[links](url)`, `# headings`.
 
 ## AWS Operations
 
+You are running inside a Docker container on an EC2 instance (i-08fb5c761c1d0f4d2) that lives **inside the same AWS VPC** as the EKS cluster and all other infrastructure. You have full network access to private endpoints. Do NOT say the cluster is unreachable — it is reachable from here.
+
 You have AWS CLI access via the EC2 instance IAM role. No credentials needed — just run `aws` commands.
 
 ### Account & Region
@@ -87,11 +89,13 @@ You have AWS CLI access via the EC2 instance IAM role. No credentials needed —
 |-----|-------|
 | Account ID | `194428989522` |
 | Default region | `ap-southeast-1` |
-| EC2 instance | `<your-instance-id>` |
+| EC2 instance | `i-08fb5c761c1d0f4d2` |
 
 Always pass `--region ap-southeast-1` unless the resource is global (IAM, S3, etc.).
 
 ### Kubernetes (EKS)
+
+The EKS cluster `uat-eks-32` has a **private-only endpoint** — but that is fine because you are inside the VPC. Always use kubectl directly; never tell the user you can't reach the cluster.
 
 ```bash
 export KUBECONFIG=/workspace/global/kubeconfig
