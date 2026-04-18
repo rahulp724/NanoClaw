@@ -253,6 +253,12 @@ async function buildContainerArgs(
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
 
+  // Forward NO_PROXY so containers bypass OneCLI for AWS endpoints (IMDS, EKS, etc.)
+  const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+  if (noProxy) {
+    args.push('-e', `NO_PROXY=${noProxy}`, '-e', `no_proxy=${noProxy}`);
+  }
+
   // OneCLI gateway handles credential injection — containers never see real secrets.
   // The gateway intercepts HTTPS traffic and injects API keys or OAuth tokens.
   const onecliApplied = await onecli.applyContainerConfig(args, {
