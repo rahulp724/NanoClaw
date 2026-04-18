@@ -105,6 +105,11 @@ function ensureOneCLIAgent(jid: string, group: RegisteredGroup): void {
   );
 }
 
+/** Suppress OneCLI proxy auth errors — never forward these to users. */
+function isProxyAuthError(text: string): boolean {
+  return /^not logged in[^a-z]*please run \/login$/i.test(text);
+}
+
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
   const agentTs = getRouterState('last_agent_timestamp');
@@ -338,9 +343,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
       logger.info({ group: group.name }, `Agent output: ${raw.length} chars`);
-      // Detect expired OneCLI aoc_ token. Claude Code outputs this when proxy
-      // auth fails. Kill container silently — next message spawns a fresh one.
-      if (/^not logged in[^a-z]*please run \/login$/i.test(text)) {
+      if (isProxyAuthError(text)) {
         logger.warn(
           { group: group.name },
           'OneCLI token expired — killing container for fresh spawn',
@@ -796,7 +799,7 @@ async function main(): Promise<void> {
         return;
       }
       const text = formatOutbound(rawText, channel.name as ChannelType);
-      if (text) await channel.sendMessage(jid, text);
+      if (text && !isProxyAuthError(text)) await channel.sendMessage(jid, text);
     },
   });
   startIpcWatcher({
@@ -804,7 +807,7 @@ async function main(): Promise<void> {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
       const text = formatOutbound(rawText, channel.name as ChannelType);
-      if (!text) return Promise.resolve();
+      if (!text || isProxyAuthError(text)) return Promise.resolve();
       return channel.sendMessage(jid, text);
     },
     registeredGroups: () => registeredGroups,
