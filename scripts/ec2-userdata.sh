@@ -1,6 +1,14 @@
 #!/bin/bash
 # EC2 bootstrap script for NanoClaw (Amazon Linux 2023)
 # Runs once on first boot via EC2 user-data
+#
+# TEMPLATE VARIABLES — substituted by scripts/aws-setup.sh at deploy time:
+#   ACCOUNT        AWS account ID          (default: 194428989522)
+#   REGION         AWS region              (default: ap-southeast-1)
+#   CHANNEL_ID     Slack channel ID        (default: C0ATKPXBVFY in --jid flag)
+#   REPO_URL       GitHub repo clone URL   (default: rahulp724/NanoClaw)
+#
+# To deploy manually (without aws-setup.sh), edit the variables below directly.
 set -euo pipefail
 exec > >(tee /var/log/nanoclaw-setup.log) 2>&1
 echo "=== NanoClaw Bootstrap: $(date) ==="

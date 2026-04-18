@@ -15,10 +15,10 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION:     ${{ vars.AWS_REGION }}
   ECR_REPOSITORY: nanoclaw-agent
-  ECR_REGISTRY: 194428989522.dkr.ecr.ap-southeast-1.amazonaws.com
-  INSTANCE_ID: i-08fb5c761c1d0f4d2
+  ECR_REGISTRY:   ${{ vars.ECR_REGISTRY }}
+  INSTANCE_ID:    ${{ vars.INSTANCE_ID }}
 
 jobs:
   deploy:
@@ -32,7 +32,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::194428989522:role/nanoclaw-github-actions
+          role-to-assume: ${{ vars.OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
@@ -53,9 +53,9 @@ jobs:
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters commands='[
-              "aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 194428989522.dkr.ecr.ap-southeast-1.amazonaws.com",
-              "docker pull 194428989522.dkr.ecr.ap-southeast-1.amazonaws.com/nanoclaw-agent:latest",
-              "docker tag 194428989522.dkr.ecr.ap-southeast-1.amazonaws.com/nanoclaw-agent:latest nanoclaw-agent:latest",
+              "aws ecr get-login-password --region '"$AWS_REGION"' | docker login --username AWS --password-stdin '"$ECR_REGISTRY"'",
+              "docker pull '"$ECR_REGISTRY"'/'"$ECR_REPOSITORY"':latest",
+              "docker tag '"$ECR_REGISTRY"'/'"$ECR_REPOSITORY"':latest nanoclaw-agent:latest",
               "systemctl restart nanoclaw",
               "echo DEPLOY_OK"
             ]' \

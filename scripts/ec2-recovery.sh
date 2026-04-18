@@ -1,4 +1,12 @@
 #!/bin/bash
+# NanoClaw EC2 recovery script — re-bootstraps a running instance from scratch.
+# Stored in SSM Parameter Store at /nanoclaw/recovery-script (auto-generated
+# by scripts/aws-setup.sh with account/region/channel substituted in).
+#
+# TEMPLATE VARIABLES — substituted by scripts/aws-setup.sh at deploy time:
+#   ACCOUNT        AWS account ID          (default: 194428989522)
+#   REGION         AWS region              (default: ap-southeast-1)
+#   CHANNEL_ID     Slack channel ID        (default: C0ATKPXBVFY in --jid flag)
 set -euo pipefail
 exec >> /var/log/nanoclaw-setup.log 2>&1
 echo "=== RECOVERY v2: $(date) ==="
@@ -37,7 +45,7 @@ echo "ONECLI_OK"
 
 # OneCLI CLI
 curl -fsSL onecli.sh/cli/install | sh
-ONECLI_URL="http://127.0.0.1:10254"
+ONECLI_URL="http://172.17.0.1:10254"
 onecli config set api-host "$ONECLI_URL"
 sleep 3
 
