@@ -105,7 +105,7 @@ cd $APP_DIR
 sudo -u ec2-user npx tsx setup/index.ts --step mounts -- --empty
 sudo -u ec2-user npx tsx setup/index.ts --step register -- \
   --jid "slack:C0ATKPXBVFY" \
-  --name "nanoclaw-sre" \
+  --name "nanoclaw-uat" \
   --folder "slack_main" \
   --trigger "@nanoclaw" \
   --channel slack \
