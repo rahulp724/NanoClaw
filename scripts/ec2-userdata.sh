@@ -117,6 +117,7 @@ Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=${NODE_PATH} ${APP_DIR}/dist/index.js
 Restart=always
 RestartSec=10
+RuntimeMaxSec=21600
 StandardOutput=append:${APP_DIR}/logs/nanoclaw.log
 StandardError=append:${APP_DIR}/logs/nanoclaw.error.log
 

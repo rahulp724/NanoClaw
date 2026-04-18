@@ -329,6 +329,26 @@ chmod +x /usr/local/bin/docker-compose
 
 ---
 
+### 7. Slack Socket Mode WebSocket silently drops after extended inactivity
+
+**Symptom:** Bot stops responding after several hours of inactivity. No errors in logs. `systemctl is-active nanoclaw` shows `active` but `nanoclaw.log` has no entries for hours.
+
+**Cause:** The Slack Socket Mode WebSocket connection can silently drop after extended idle periods without the `@slack/bolt` library detecting it. The process stays alive but receives no messages.
+
+**Fix:** `RuntimeMaxSec=21600` in the systemd `[Service]` block forces a clean restart every 6 hours. Already baked into the UserData and recovery scripts. In-flight containers are detached (not killed) on restart, so active conversations are not interrupted.
+
+To apply to a running instance:
+```bash
+# Verify it's set
+grep RuntimeMaxSec /etc/systemd/system/nanoclaw.service
+
+# If missing, add it and reload
+sed -i "/RestartSec=10/a RuntimeMaxSec=21600" /etc/systemd/system/nanoclaw.service
+systemctl daemon-reload
+```
+
+---
+
 ## Troubleshooting
 
 ### Instance never appears in SSM
@@ -360,11 +380,13 @@ Common causes:
 **Fix:** Clear the stale session:
 ```bash
 # On the EC2 instance
-rm -f /opt/nanoclaw/data/sessions/slack_main/.claude/sessions/*.jsonl
+rm -f /opt/nanoclaw/data/sessions/slack_main/.claude/projects/*/*.jsonl
 sqlite3 /opt/nanoclaw/store/messages.db "DELETE FROM sessions WHERE group_folder='slack_main'"
 ```
 
 This is transient — the next message will start a fresh session automatically.
+
+Note: Claude Code stores session files in `~/.claude/projects/<project_hash>/`, not `~/.claude/sessions/`. On EC2 the full path is `/opt/nanoclaw/data/sessions/slack_main/.claude/projects/-workspace-group/`.
 
 ### Bot connects but doesn't respond to messages
 
