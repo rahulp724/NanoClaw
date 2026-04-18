@@ -1,4 +1,4 @@
-# Andy
+can # Andy
 
 You are Andy, a personal assistant. You help with tasks, answer questions, and can schedule reminders.
 
@@ -106,20 +106,37 @@ aws eks update-kubeconfig --name <cluster-name> --region ap-southeast-1 \
 
 ### Key Resources
 
-Fill in your actual resource names below so you can refer to them by name in prompts without needing to look up IDs:
+| Resource | Name(s) |
+|----------|---------|
+| EKS cluster | `uat-eks-32` |
+| RDS cluster | `uat-mysql-cds100-cluster` |
+| Valkey / ElastiCache | `uat-ecg-api-cache`, `uat-valkey-ecg`, `uat-valkey-echo` |
+| ALB | `uat-alb` |
+| NLB | `uat-device`, `uat-tr400` |
+| WAF ACL | `Test` |
+| ECR repo | `nanoclaw-agent` |
+| Grafana | `https://uat-grafana.tricogdev.net` |
 
-```
-EKS cluster:      <your-cluster-name>
-RDS cluster:      <your-aurora-cluster-id>
-Valkey cluster:   <your-elasticache-cluster-id>
-ALB name:         <your-alb-name>
-WAF ACL name:     <your-waf-acl-name>
-SQS queues:       <queue-name-1>, <queue-name-2>
-ECR repo:         nanoclaw-agent
-Athena workgroup: primary
-Athena results:   s3://<your-results-bucket>/athena-results/
-Grafana:          <your-grafana-url>
-```
+### SQS Queues
+
+| Queue | DLQ / Errored |
+|-------|---------------|
+| `uat-ou-dicom-sr-s3` | `uat-ou-dicom-sr-s3-errored` |
+| `uat-ou-echo-qa-process` | `uat-ou-echo-qa-process-errored` |
+| `uat-ou-echo-submission` | `uat-ou-echo-submission-errored` |
+| `uat-ou-external-patient` | `uat-ou-external-patient-errored` |
+| `uat-ou-goqii-queue` | `uat-ou-goqii-queue-errored` |
+| `uat-ou-medical-ai-integration` | `uat-ou-medical-ai-integration-dlq` |
+| `uat-ou-sema-generation` | `uat-ou-sema-generation-errored` |
+| `uat-ou-sp-diagnosed-to-stemi` | `uat-ou-sp-diagnosed-to-stemi-errored` |
+| `uat-ou-sp-to-mq` | — |
+| `uat-ou-sp-to-wfm` | `uat-ou-sp-to-wfm-errored` |
+| `uat-ou-timeout-cases-for-auto-submission` | — |
+| `uat-ou-webhook` | `uat-ou-webhook-errored` |
+| `uat-ou-wfm-timedout` | `uat-ou-wfm-timedout-nodecision` |
+| `uat-ou-wfm-to-atlas` | `uat-ou-wfm-to-atlas-errored` |
+| `uat-ou-wfm-to-cds100` | `uat-ou-wfm-to-cds100-errored` |
+| `uat-ou-wfm-to-sp` | `uat-ou-wfm-to-sp-errored` |
 
 ### Skill reference
 
