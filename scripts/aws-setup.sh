@@ -57,7 +57,7 @@ step "Collecting configuration"
 CURRENT_STEP="inputs"
 
 prompt_var() {
-  local var="$1" prompt="$2" default="${3:-}" secret="${4:-false}"
+  local var="$1" prompt="$2" default="${3:-}" secret="${4:-false}" optional="${5:-false}"
   local current="${!var:-}"
   if [[ -n "$current" ]]; then
     [[ "$secret" == "true" ]] && ok "$var = [already set]" || ok "$var = $current"
@@ -69,6 +69,9 @@ prompt_var() {
   elif [[ "$secret" == "true" ]]; then
     read -rsp "  $prompt: " input; echo
     [[ -n "$input" ]] || err "$var is required"
+    printf -v "$var" '%s' "$input"
+  elif [[ "$optional" == "true" ]]; then
+    read -r -p "  $prompt (optional, press Enter to skip): " input
     printf -v "$var" '%s' "$input"
   else
     read -r -p "  $prompt: " input
@@ -90,7 +93,7 @@ prompt_var SLACK_APP_TOKEN     "Slack App Token (xapp-...)"    "" "true"
 prompt_var SLACK_CHANNEL_ID    "Slack channel ID (e.g. C0ATKPXBVFY)"
 prompt_var GITHUB_REPO         "GitHub repo (owner/repo)"
 prompt_var INSTANCE_TYPE       "EC2 instance type"            "t3.medium"
-prompt_var KEY_NAME            "EC2 key pair name (optional, press Enter to skip)" ""
+prompt_var KEY_NAME            "EC2 key pair name" "" "false" "true"
 
 # ── validation ────────────────────────────────────────────────────────────────
 step "Validating inputs"
