@@ -30,6 +30,32 @@ RUN apt-get update && apt-get install -y \
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
+# CLI tools for AWS operations (installed as root, available to all users)
+# jq: JSON parsing for aws CLI output
+# unzip: required by AWS CLI v2 installer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unzip \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# AWS CLI v2 — lets the agent run any `aws` command
+# Credentials come from the EC2 instance IAM role via IMDS (no keys needed).
+# IMDS must have HttpPutResponseHopLimit=2 on the EC2 instance (see ec2-userdata.sh).
+RUN curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip \
+    && unzip -q /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# kubectl — lets the agent query EKS clusters
+# kubeconfig is mounted from /opt/nanoclaw/groups/global/kubeconfig on the host.
+RUN KUBECTL_VERSION=$(curl -fsSL https://dl.k8s.io/release/stable.txt) \
+    && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+        -o /usr/local/bin/kubectl \
+    && chmod +x /usr/local/bin/kubectl
+
+# Default region — overridable by setting AWS_DEFAULT_REGION in .env
+ENV AWS_DEFAULT_REGION=ap-southeast-1
+
 # Install agent-browser and claude-code globally
 RUN npm install -g agent-browser @anthropic-ai/claude-code
 

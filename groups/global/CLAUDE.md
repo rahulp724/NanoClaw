@@ -77,6 +77,62 @@ Standard Markdown works: `**bold**`, `*italic*`, `[links](url)`, `# headings`.
 
 ---
 
+## AWS Operations
+
+You have AWS CLI access via the EC2 instance IAM role. No credentials needed — just run `aws` commands.
+
+### Account & Region
+
+| Key | Value |
+|-----|-------|
+| Account ID | `194428989522` |
+| Default region | `ap-southeast-1` |
+| EC2 instance | `i-08fb5c761c1d0f4d2` |
+
+Always pass `--region ap-southeast-1` unless the resource is global (IAM, S3, etc.).
+
+### Kubernetes (EKS)
+
+```bash
+export KUBECONFIG=/workspace/global/kubeconfig
+```
+
+The kubeconfig file is mounted from the host into every agent container at `/workspace/global/kubeconfig`. If it doesn't exist yet, generate it on EC2 with:
+
+```bash
+aws eks update-kubeconfig --name <cluster-name> --region ap-southeast-1 \
+  --kubeconfig /opt/nanoclaw/groups/global/kubeconfig
+```
+
+### Key Resources
+
+Fill in your actual resource names below so you can refer to them by name in prompts without needing to look up IDs:
+
+```
+EKS cluster:      <your-cluster-name>
+RDS cluster:      <your-aurora-cluster-id>
+Valkey cluster:   <your-elasticache-cluster-id>
+ALB name:         <your-alb-name>
+WAF ACL name:     <your-waf-acl-name>
+SQS queues:       <queue-name-1>, <queue-name-2>
+ECR repo:         nanoclaw-agent
+Athena workgroup: primary
+Athena results:   s3://<your-results-bucket>/athena-results/
+Grafana:          <your-grafana-url>
+```
+
+### Skill reference
+
+| Question | Skill |
+|----------|-------|
+| CloudWatch alarms, logs, metrics | `aws-observability` |
+| EC2, Lambda, EKS pods, ECR images | `aws-compute` |
+| RDS, Valkey, SQS, SNS, S3 | `aws-data` |
+| ALB, NLB, API Gateway, WAF, EFS | `aws-network` |
+| Athena queries, Cognito users | `aws-analytics` |
+
+---
+
 ## Task Scripts
 
 For any recurring task, use `schedule_task`. Frequent agent invocations — especially multiple times a day — consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` — it runs first, and the agent is only called when the check passes. This keeps invocations to a minimum.

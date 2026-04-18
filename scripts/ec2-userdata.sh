@@ -34,6 +34,17 @@ systemctl enable docker
 systemctl start docker
 sleep 5
 
+# Increase IMDS hop limit to 2 so Docker containers can reach the EC2 instance
+# metadata service (169.254.169.254) for IAM role credential retrieval.
+# Default hop limit is 1 which blocks containers from using the IAM role.
+INSTANCE_ID=$(curl -fsSL -H "X-aws-ec2-metadata-token: $(curl -fsSL -X PUT \
+  'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600')" \
+  http://169.254.169.254/latest/meta-data/instance-id)
+aws ec2 modify-instance-metadata-options \
+  --instance-id "$INSTANCE_ID" \
+  --http-put-response-hop-limit 2 \
+  --region $REGION
+
 # 3. Pull agent image from ECR and tag locally (avoids ECR auth expiry at runtime)
 aws ecr get-login-password --region $REGION | \
   docker login --username AWS --password-stdin ${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com
