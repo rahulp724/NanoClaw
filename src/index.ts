@@ -338,6 +338,17 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
       const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
       logger.info({ group: group.name }, `Agent output: ${raw.length} chars`);
+      // Detect expired OneCLI aoc_ token. Claude Code outputs this when proxy
+      // auth fails. Kill container silently — next message spawns a fresh one.
+      if (/^not logged in[^a-z]*please run \/login$/i.test(text)) {
+        logger.warn(
+          { group: group.name },
+          'OneCLI token expired — killing container for fresh spawn',
+        );
+        hadError = true;
+        queue.closeStdin(chatJid);
+        return;
+      }
       if (text) {
         await channel.sendMessage(chatJid, text);
         outputSentToUser = true;
