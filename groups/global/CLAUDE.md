@@ -62,6 +62,20 @@ Use Slack mrkdwn syntax. Run `/slack-formatting` for the full reference. Key rul
 - `>` for block quotes
 - No `##` headings — use `*Bold text*` instead
 
+#### Thread replies
+
+Every message has an `id` attribute in the conversation (e.g. `id="1776595714.525489"`). That value is the Slack message timestamp.
+
+When the user says "reply in a thread", "put that in a thread", or asks you to thread a response:
+1. Find the `id` of the message you're replying to
+2. Call `reply_in_thread` with `jid` = the current channel JID and `thread_ts` = that `id`
+
+Example — user says "reply to my last message in a thread":
+- Their message had `id="1776595714.525489"` and the channel is `slack:C0ATKPXBVFY`
+- Call `reply_in_thread(jid="slack:C0ATKPXBVFY", thread_ts="1776595714.525489", text="...")`
+
+You do NOT need to ask the user for the ts — it is always visible in the `id` attribute of their message.
+
 ### WhatsApp/Telegram channels (folder starts with `whatsapp_` or `telegram_`)
 
 - `*bold*` (single asterisks, NEVER **double**)
