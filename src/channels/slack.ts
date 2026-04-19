@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 import { App, LogLevel } from '@slack/bolt';
 import type { GenericMessageEvent, BotMessageEvent } from '@slack/types';
 
@@ -259,6 +261,77 @@ export class SlackChannel implements Channel {
       logger.debug({ userId, err }, 'Failed to resolve Slack user name');
       return undefined;
     }
+  }
+
+  getClient() {
+    return this.app.client;
+  }
+
+  async sendBlocks(
+    jid: string,
+    blocks: unknown[],
+    text: string,
+  ): Promise<string> {
+    const channelId = jid.replace(/^slack:/, '');
+    const result = await this.app.client.chat.postMessage({
+      channel: channelId,
+      text,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      blocks: blocks as any,
+    });
+    return (result.ts as string) || '';
+  }
+
+  async updateMessage(
+    jid: string,
+    ts: string,
+    blocks: unknown[],
+    text: string,
+  ): Promise<void> {
+    const channelId = jid.replace(/^slack:/, '');
+    await this.app.client.chat.update({
+      channel: channelId,
+      ts,
+      text,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      blocks: blocks as any,
+    });
+  }
+
+  async openModal(triggerId: string, view: unknown): Promise<void> {
+    await this.app.client.views.open({
+      trigger_id: triggerId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      view: view as any,
+    });
+  }
+
+  async replyInThread(
+    jid: string,
+    threadTs: string,
+    text: string,
+  ): Promise<void> {
+    const channelId = jid.replace(/^slack:/, '');
+    await this.app.client.chat.postMessage({
+      channel: channelId,
+      thread_ts: threadTs,
+      text,
+    });
+  }
+
+  async uploadFile(
+    jid: string,
+    filePath: string,
+    filename: string,
+    title?: string,
+  ): Promise<void> {
+    const channelId = jid.replace(/^slack:/, '');
+    await this.app.client.files.uploadV2({
+      channel_id: channelId,
+      file: fs.readFileSync(filePath),
+      filename,
+      title: title || filename,
+    });
   }
 
   private async flushOutgoingQueue(): Promise<void> {

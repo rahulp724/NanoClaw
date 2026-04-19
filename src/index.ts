@@ -49,6 +49,8 @@ import {
 import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
+import { startInteractivityServer } from './slack-interactivity.js';
+import { SlackChannel } from './channels/slack.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { ChannelType } from './text-styles.js';
 import {
@@ -785,6 +787,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const slackCh = channels.find((c) => c.name === 'slack') as
+    | SlackChannel
+    | undefined;
+
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({
     registeredGroups: () => registeredGroups,
@@ -838,7 +844,27 @@ async function main(): Promise<void> {
         writeTasksSnapshot(group.folder, group.isMain === true, taskRows);
       }
     },
+    sendBlocks: slackCh
+      ? (jid, blocks, text) => slackCh.sendBlocks(jid, blocks, text)
+      : undefined,
+    updateMessage: slackCh
+      ? (jid, ts, blocks, text) => slackCh.updateMessage(jid, ts, blocks, text)
+      : undefined,
+    openModal: slackCh
+      ? (triggerId, view) => slackCh.openModal(triggerId, view)
+      : undefined,
+    replyInThread: slackCh
+      ? (jid, threadTs, text) => slackCh.replyInThread(jid, threadTs, text)
+      : undefined,
+    uploadFile: slackCh
+      ? (jid, filePath, filename, title) =>
+          slackCh.uploadFile(jid, filePath, filename, title)
+      : undefined,
   });
+
+  if (slackCh) {
+    startInteractivityServer(channelOpts.onMessage, () => registeredGroups);
+  }
   startSessionCleanup();
   queue.setProcessMessagesFn(processGroupMessages);
   recoverPendingMessages();

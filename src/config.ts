@@ -11,6 +11,7 @@ const envConfig = readEnvFile([
   'ONECLI_URL',
   'ONECLI_API_KEY',
   'TZ',
+  'SLACK_SIGNING_SECRET',
 ]);
 
 export const ASSISTANT_NAME =
@@ -82,6 +83,13 @@ export function getTriggerPattern(trigger?: string): RegExp {
 }
 
 export const TRIGGER_PATTERN = buildTriggerPattern(DEFAULT_TRIGGER);
+
+export const SLACK_INTERACTIVITY_PORT = parseInt(
+  process.env.SLACK_INTERACTIVITY_PORT || '3000',
+  10,
+);
+export const SLACK_SIGNING_SECRET =
+  process.env.SLACK_SIGNING_SECRET || envConfig.SLACK_SIGNING_SECRET || '';
 
 // Timezone for scheduled tasks, message formatting, etc.
 // Validates each candidate is a real IANA identifier before accepting.

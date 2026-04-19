@@ -14,6 +14,8 @@ import { CronExpressionParser } from 'cron-parser';
 const IPC_DIR = '/workspace/ipc';
 const MESSAGES_DIR = path.join(IPC_DIR, 'messages');
 const TASKS_DIR = path.join(IPC_DIR, 'tasks');
+const RESULTS_DIR = path.join(IPC_DIR, 'results');
+const UPLOADS_DIR = path.join(IPC_DIR, 'uploads');
 
 // Context from environment variables (set by the agent runner)
 const chatJid = process.env.NANOCLAW_CHAT_JID!;
@@ -499,6 +501,262 @@ Use available_groups.json to find the JID for a group. The folder name must be c
           text: `Group "${args.name}" registered. It will start receiving messages immediately.`,
         },
       ],
+    };
+  },
+);
+
+server.tool(
+  'send_blocks',
+  `Send a Slack Block Kit message with interactive elements (buttons, dropdowns, etc.).
+Returns the message timestamp (\`ts\`) which you MUST save — it is required to update or replace the message later.
+
+SLACK-ONLY: Only works when the current channel is Slack (jid starts with "slack:"). For other channels, use send_message instead.
+
+BLOCKS FORMAT: Provide a valid Block Kit JSON array. See https://api.slack.com/block-kit for reference.
+- Use "section" blocks for text, "actions" blocks for buttons/dropdowns
+- Button action_id must start with "agent:" to route back to you, or "ack:" for silent acknowledgment
+- Always include a plain-text \`text\` fallback for notifications
+
+EXAMPLE — Approve/Cancel buttons:
+\`\`\`json
+[
+  {"type":"section","text":{"type":"mrkdwn","text":"*Scale down deployment?*\\nNamespace: \`prod\` / Pod: \`api\`"}},
+  {"type":"actions","elements":[
+    {"type":"button","text":{"type":"plain_text","text":"Scale down ✓"},"style":"danger","action_id":"agent:scale_down"},
+    {"type":"button","text":{"type":"plain_text","text":"Cancel ✗"},"style":"primary","action_id":"agent:cancel"}
+  ]}
+]
+\`\`\``,
+  {
+    jid: z
+      .string()
+      .optional()
+      .describe(
+        'Slack channel JID (e.g. "slack:C0ATKPXBVFY"). Defaults to the current chat.',
+      ),
+    text: z
+      .string()
+      .describe('Fallback plain text shown in notifications and non-Block-Kit clients'),
+    blocks: z
+      .array(z.unknown())
+      .describe('Block Kit blocks array — buttons, sections, dropdowns, etc.'),
+  },
+  async (args) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(MESSAGES_DIR, {
+      type: 'send_blocks',
+      chatJid: args.jid || chatJid,
+      text: args.text,
+      blocks: args.blocks,
+      requestId,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Poll for the message ts written back by the host
+    const resultPath = path.join(RESULTS_DIR, `${requestId}.json`);
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      if (fs.existsSync(resultPath)) {
+        try {
+          const result = JSON.parse(fs.readFileSync(resultPath, 'utf-8')) as { ts?: string };
+          fs.unlinkSync(resultPath);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: result.ts
+                  ? `Message sent. ts=${result.ts} — save this to update the message later.`
+                  : 'Message sent.',
+              },
+            ],
+          };
+        } catch {
+          break;
+        }
+      }
+    }
+
+    return {
+      content: [{ type: 'text' as const, text: 'Message sent (ts not returned within timeout).' }],
+    };
+  },
+);
+
+server.tool(
+  'update_message',
+  `Replace a previously sent Block Kit message in-place. Use the \`ts\` returned by send_blocks.
+Useful for: replacing Approve/Cancel buttons with a "Done ✓" confirmation after the user clicks.
+
+SLACK-ONLY: Only works for Slack channels.`,
+  {
+    jid: z
+      .string()
+      .optional()
+      .describe('Slack channel JID. Defaults to the current chat.'),
+    ts: z
+      .string()
+      .describe('Message timestamp returned by send_blocks (e.g. "1713400000.123456")'),
+    text: z
+      .string()
+      .describe('Updated fallback plain text'),
+    blocks: z
+      .array(z.unknown())
+      .describe('Updated Block Kit blocks array'),
+  },
+  async (args) => {
+    writeIpcFile(MESSAGES_DIR, {
+      type: 'update_message',
+      chatJid: args.jid || chatJid,
+      ts: args.ts,
+      text: args.text,
+      blocks: args.blocks,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    return {
+      content: [{ type: 'text' as const, text: `Message ${args.ts} update requested.` }],
+    };
+  },
+);
+
+server.tool(
+  'open_modal',
+  `Open a Slack modal dialog. ONLY valid inside a [SLACK_ACTION] handler — requires a trigger_id which expires 3 seconds after the user clicks the button.
+
+Do NOT run any commands or tools before calling open_modal. Call it immediately when handling an action that should open a modal.
+For multi-step flows, prefer: button → send a confirmation message asking for input → user replies → you act.
+
+SLACK-ONLY.`,
+  {
+    trigger_id: z
+      .string()
+      .describe('The trigger_id from the [SLACK_ACTION] payload — expires in 3 seconds'),
+    view: z
+      .record(z.unknown())
+      .describe('Slack modal view object (type: "modal", title, blocks, submit, etc.)'),
+  },
+  async (args) => {
+    writeIpcFile(MESSAGES_DIR, {
+      type: 'open_modal',
+      triggerId: args.trigger_id,
+      view: args.view,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    return {
+      content: [{ type: 'text' as const, text: 'Modal open requested.' }],
+    };
+  },
+);
+
+server.tool(
+  'reply_in_thread',
+  `Post a reply inside a Slack thread. Use when you want to keep a conversation thread clean.
+The thread_ts is the timestamp of the parent message (the one that started the thread).
+
+SLACK-ONLY.`,
+  {
+    jid: z
+      .string()
+      .optional()
+      .describe('Slack channel JID. Defaults to the current chat.'),
+    thread_ts: z
+      .string()
+      .describe('Timestamp of the parent message (e.g. "1713400000.123456")'),
+    text: z
+      .string()
+      .describe('Reply text (Slack mrkdwn format)'),
+  },
+  async (args) => {
+    writeIpcFile(MESSAGES_DIR, {
+      type: 'reply_in_thread',
+      chatJid: args.jid || chatJid,
+      threadTs: args.thread_ts,
+      text: args.text,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    return {
+      content: [{ type: 'text' as const, text: 'Thread reply requested.' }],
+    };
+  },
+);
+
+server.tool(
+  'upload_image',
+  `Upload a file or image to a Slack channel.
+
+HOW TO USE:
+1. Generate or save the file to /workspace/ipc/uploads/<filename> (e.g. /workspace/ipc/uploads/chart.png)
+2. Call this tool with subpath="uploads/<filename>"
+
+The file must be inside /workspace/ipc/. Files elsewhere are not accessible.
+
+SLACK-ONLY.`,
+  {
+    jid: z
+      .string()
+      .optional()
+      .describe('Slack channel JID. Defaults to the current chat.'),
+    subpath: z
+      .string()
+      .describe(
+        'Path relative to /workspace/ipc/ where the file is saved (e.g. "uploads/chart.png")',
+      ),
+    filename: z.string().describe('Filename as it appears in Slack'),
+    title: z
+      .string()
+      .optional()
+      .describe('Optional display title shown above the file in Slack'),
+  },
+  async (args) => {
+    // Validate subpath to prevent path traversal
+    const normalized = path.normalize(args.subpath);
+    if (normalized.startsWith('..') || path.isAbsolute(normalized)) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'Invalid subpath: must be a relative path inside /workspace/ipc/ (e.g. "uploads/chart.png")',
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const fullPath = path.join(IPC_DIR, normalized);
+    if (!fs.existsSync(fullPath)) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `File not found at /workspace/ipc/${normalized}. Save the file there first.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Ensure uploads dir exists
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+    writeIpcFile(MESSAGES_DIR, {
+      type: 'upload_file',
+      chatJid: args.jid || chatJid,
+      subpath: normalized,
+      filename: args.filename,
+      title: args.title,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    return {
+      content: [{ type: 'text' as const, text: `File upload requested: ${args.filename}` }],
     };
   },
 );

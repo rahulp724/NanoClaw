@@ -23,6 +23,12 @@ export interface IpcDeps {
     registeredJids: Set<string>,
   ) => void;
   onTasksChanged: () => void;
+  // Slack Block Kit operations (optional — only present when Slack channel is connected)
+  sendBlocks?: (jid: string, blocks: unknown[], text: string) => Promise<string>;
+  updateMessage?: (jid: string, ts: string, blocks: unknown[], text: string) => Promise<void>;
+  openModal?: (triggerId: string, view: unknown) => Promise<void>;
+  replyInThread?: (jid: string, threadTs: string, text: string) => Promise<void>;
+  uploadFile?: (jid: string, filePath: string, filename: string, title?: string) => Promise<void>;
 }
 
 let ipcWatcherRunning = false;
@@ -90,6 +96,140 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   logger.warn(
                     { chatJid: data.chatJid, sourceGroup },
                     'Unauthorized IPC message attempt blocked',
+                  );
+                }
+              } else if (
+                data.type === 'send_blocks' &&
+                deps.sendBlocks &&
+                data.chatJid &&
+                data.blocks
+              ) {
+                const targetGroup = registeredGroups[data.chatJid];
+                if (
+                  isMain ||
+                  (targetGroup && targetGroup.folder === sourceGroup)
+                ) {
+                  const ts = await deps.sendBlocks(
+                    data.chatJid,
+                    data.blocks,
+                    data.text || '',
+                  );
+                  if (data.requestId) {
+                    const resultDir = path.join(
+                      ipcBaseDir,
+                      sourceGroup,
+                      'results',
+                    );
+                    fs.mkdirSync(resultDir, { recursive: true });
+                    fs.writeFileSync(
+                      path.join(resultDir, `${data.requestId}.json`),
+                      JSON.stringify({ ts }),
+                    );
+                  }
+                  logger.info(
+                    { chatJid: data.chatJid, ts, sourceGroup },
+                    'IPC send_blocks sent',
+                  );
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC send_blocks attempt blocked',
+                  );
+                }
+              } else if (
+                data.type === 'update_message' &&
+                deps.updateMessage &&
+                data.chatJid &&
+                data.ts &&
+                data.blocks
+              ) {
+                const targetGroup = registeredGroups[data.chatJid];
+                if (
+                  isMain ||
+                  (targetGroup && targetGroup.folder === sourceGroup)
+                ) {
+                  await deps.updateMessage(
+                    data.chatJid,
+                    data.ts,
+                    data.blocks,
+                    data.text || '',
+                  );
+                  logger.info(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'IPC update_message sent',
+                  );
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC update_message attempt blocked',
+                  );
+                }
+              } else if (
+                data.type === 'open_modal' &&
+                deps.openModal &&
+                data.triggerId &&
+                data.view
+              ) {
+                await deps.openModal(data.triggerId, data.view);
+                logger.info({ sourceGroup }, 'IPC open_modal sent');
+              } else if (
+                data.type === 'reply_in_thread' &&
+                deps.replyInThread &&
+                data.chatJid &&
+                data.threadTs &&
+                data.text
+              ) {
+                const targetGroup = registeredGroups[data.chatJid];
+                if (
+                  isMain ||
+                  (targetGroup && targetGroup.folder === sourceGroup)
+                ) {
+                  await deps.replyInThread(
+                    data.chatJid,
+                    data.threadTs,
+                    data.text,
+                  );
+                  logger.info(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'IPC reply_in_thread sent',
+                  );
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC reply_in_thread attempt blocked',
+                  );
+                }
+              } else if (
+                data.type === 'upload_file' &&
+                deps.uploadFile &&
+                data.chatJid &&
+                data.subpath &&
+                data.filename
+              ) {
+                const targetGroup = registeredGroups[data.chatJid];
+                if (
+                  isMain ||
+                  (targetGroup && targetGroup.folder === sourceGroup)
+                ) {
+                  const hostFilePath = path.join(
+                    ipcBaseDir,
+                    sourceGroup,
+                    data.subpath,
+                  );
+                  await deps.uploadFile(
+                    data.chatJid,
+                    hostFilePath,
+                    data.filename,
+                    data.title,
+                  );
+                  logger.info(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'IPC upload_file sent',
+                  );
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC upload_file attempt blocked',
                   );
                 }
               }
