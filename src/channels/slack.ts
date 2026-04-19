@@ -65,6 +65,141 @@ export class SlackChannel implements Channel {
     });
 
     this.setupEventHandlers();
+    this.setupInteractivityHandlers();
+  }
+
+  private setupInteractivityHandlers(): void {
+    // Button clicks, dropdown selections — action_id must start with "agent:"
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.app.action(/^agent:.*/, async ({ action, body, ack }: any) => {
+      await ack();
+
+      const channelId = body.channel?.id || body.container?.channel_id;
+      if (!channelId) return;
+      const jid = `slack:${channelId}`;
+      const groups = this.opts.registeredGroups();
+      if (!groups[jid]) return;
+
+      const userId: string = body.user?.id || '';
+      const userName: string =
+        body.user?.name || body.user?.username || userId || 'unknown';
+      const originalTs: string = body.message?.ts || '';
+
+      // Collect state values (dropdowns, text inputs)
+      const collectedValues: Record<string, string> = {};
+      const stateValues = body.state?.values as
+        | Record<string, Record<string, { value?: string; selected_option?: { value: string } }>>
+        | undefined;
+      if (stateValues) {
+        for (const blockValues of Object.values(stateValues)) {
+          for (const [id, v] of Object.entries(blockValues)) {
+            collectedValues[id] =
+              v.value || v.selected_option?.value || '';
+          }
+        }
+      }
+
+      const lines = [
+        '[SLACK_ACTION]',
+        `action_id: ${action.action_id}`,
+        `values: ${JSON.stringify(collectedValues)}`,
+        `user: ${userName}`,
+      ];
+      if (originalTs) lines.push(`original_message_ts: ${originalTs}`);
+      // Provide trigger_id so agent can open a modal immediately (3-second window)
+      if (body.trigger_id) lines.push(`trigger_id: ${body.trigger_id}`);
+
+      this.opts.onMessage(jid, {
+        id: `action-${action.action_ts || String(Date.now())}`,
+        chat_jid: jid,
+        sender: userId,
+        sender_name: userName,
+        content: lines.join('\n'),
+        timestamp: new Date().toISOString(),
+        is_from_me: false,
+        is_bot_message: false,
+      });
+    });
+
+    // Modal submissions — callback_id must start with "agent:"
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.app.view(/^agent:.*/, async ({ view, body, ack }: any) => {
+      await ack();
+
+      // Channel JID is stored in private_metadata when the modal was opened
+      const privateMetadata: string = view.private_metadata || '';
+      let jid: string | undefined;
+      if (privateMetadata) {
+        try {
+          const meta = JSON.parse(privateMetadata) as Record<string, string>;
+          jid = meta.jid;
+        } catch {
+          jid = privateMetadata; // treat as bare JID
+        }
+      }
+      if (!jid) return;
+      const groups = this.opts.registeredGroups();
+      if (!groups[jid]) return;
+
+      const userId: string = body.user?.id || '';
+      const userName: string = body.user?.name || userId || 'unknown';
+
+      this.opts.onMessage(jid, {
+        id: `modal-${Date.now()}`,
+        chat_jid: jid,
+        sender: userId,
+        sender_name: userName,
+        content: [
+          '[SLACK_MODAL_SUBMIT]',
+          `callback_id: ${view.callback_id}`,
+          `values: ${JSON.stringify(view.state?.values || {})}`,
+          `user: ${userName}`,
+        ].join('\n'),
+        timestamp: new Date().toISOString(),
+        is_from_me: false,
+        is_bot_message: false,
+      });
+    });
+
+    // Slash commands — matches any /command
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.app.command(/\/.*/ as any, async ({ command, ack }: any) => {
+      await ack();
+
+      const channelJid = `slack:${command.channel_id}`;
+      const groups = this.opts.registeredGroups();
+
+      let targetJid: string;
+      if (groups[channelJid]) {
+        targetJid = channelJid;
+      } else {
+        const mainEntry = Object.entries(groups).find(([, g]) => g.isMain);
+        if (!mainEntry) {
+          logger.warn(
+            { command: command.command },
+            'Slash command: no registered group found',
+          );
+          return;
+        }
+        targetJid = mainEntry[0];
+      }
+
+      this.opts.onMessage(targetJid, {
+        id: `cmd-${Date.now()}`,
+        chat_jid: targetJid,
+        sender: command.user_id,
+        sender_name: command.user_name || command.user_id || 'unknown',
+        content: [
+          `[SLASH_COMMAND ${command.command}]`,
+          `user: ${command.user_name}`,
+          `channel: ${command.channel_id}`,
+          `text: ${command.text}`,
+        ].join('\n'),
+        timestamp: new Date().toISOString(),
+        is_from_me: false,
+        is_bot_message: false,
+      });
+    });
   }
 
   private setupEventHandlers(): void {
